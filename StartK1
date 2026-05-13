@@ -1,0 +1,30 @@
+using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public class ScrStartK1 : MonoBehaviour
+{
+    [Header("UI References")]
+    public Button startButton;
+    public GameObject methodPanel1;       // 픽업 / 배송 선택 패널
+    public GameObject methodPanel2;
+
+    private void Start()
+    {
+        methodPanel1.SetActive(false);
+        startButton.onClick.AddListener(OnStartClicked);
+
+    }
+
+    public void OnStartClicked()
+    {
+        startButton.gameObject.SetActive(false);
+        methodPanel1.SetActive(true);
+        methodPanel2.SetActive(false);
+
+    }
+
+
+}
