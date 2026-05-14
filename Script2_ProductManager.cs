@@ -117,48 +117,95 @@ public class Script2_ProductManager : MonoBehaviour
     private string composition = "혼합";
     private string packageType = "기본";
 
-    private void Start()
-    {
-        BindButtons();
-        if (goPayBtn != null) goPayBtn.interactable = false; // 장바구니가 비어 있으면 결제 버튼 비활성화
-    }
+    // ── 필드 선언부 (클래스 상단에 위치) ────────────────────────
 
-    /// <summary>
-    /// 옵션 관련 버튼 이벤트를 연결한다.
-    /// </summary>
+    [Header("일반과일 버튼")]
+    public Button[] fruitButtons;
+
+    [Header("컵과일 버튼")]
+    public Button[] cupButtons;
+
+    [Header("선물세트 버튼")]
+    public Button[] giftButtons;
+
+    private readonly string[] fruitNames = { "사과", "딸기", "포도", "수박", "복숭아", "오렌지" };
+    private readonly int[] fruitPrices = { 5000, 6000, 7000, 12000, 8000, 6500 };
+
+    private readonly string[] cupNames = { "딸기컵", "과일컵", "멜론컵", "수박컵", "망고컵", "믹스컵" };
+    private readonly int[] cupPrices = { 4500, 5000, 8000, 7000, 9000, 5500 };
+
+    private readonly string[] giftNames = { "사과세트", "배세트", "감귤세트", "포도세트", "혼합세트A", "혼합세트B" };
+    private readonly int[] giftPrices = { 25000, 28000, 22000, 30000, 35000, 40000 };
+
+
+    // ── BindButtons() : 3개를 1개로 합친 버전 ───────────────────
+
+    /// <summary>모든 버튼 이벤트를 한 곳에서 연결한다.</summary>
     private void BindButtons()
     {
+        // 수량 / 장바구니
         AddClick(minusBtn, () => ChangeQuantity(-1));
         AddClick(plusBtn, () => ChangeQuantity(1));
         AddClick(addToCartBtn, AddCurrentItemToCart);
 
+        // 크기
         AddClick(sizeSmallBtn, () => SetSize("소"));
         AddClick(sizeMediumBtn, () => SetSize("중"));
         AddClick(sizeLargeBtn, () => SetSize("대"));
 
+        // 당도 (일반과일 전용)
         AddClick(sweetLowBtn, () => SetSweetness("낮음"));
         AddClick(sweetMediumBtn, () => SetSweetness("보통"));
         AddClick(sweetHighBtn, () => SetSweetness("높음"));
 
+        // 컵과일 구성
         AddClick(cupSingleBtn, () => SetComposition("단일"));
         AddClick(cupMixBtn, () => SetComposition("혼합"));
         AddClick(cupPremiumBtn, () => SetComposition("프리미엄"));
 
+        // 선물세트 포장
         AddClick(packBasicBtn, () => SetPackage("기본"));
         AddClick(packRibbonBtn, () => SetPackage("리본"));
         AddClick(packLuxuryBtn, () => SetPackage("고급"));
+
+        // 일반과일 버튼 6개
+        for (int i = 0; i < fruitButtons.Length; i++)
+        {
+            int idx = i; // 클로저 캡처 방지 - 삭제 금지
+            AddClick(fruitButtons[idx], () => OpenFruitOption(fruitNames[idx], fruitPrices[idx]));
+        }
+
+        // 컵과일 버튼 6개
+        for (int i = 0; i < cupButtons.Length; i++)
+        {
+            int idx = i;
+            AddClick(cupButtons[idx], () => OpenCupOption(cupNames[idx], cupPrices[idx]));
+        }
+
+        // 선물세트 버튼 6개
+        for (int i = 0; i < giftButtons.Length; i++)
+        {
+            int idx = i;
+            AddClick(giftButtons[idx], () => OpenGiftOption(giftNames[idx], giftPrices[idx]));
+        }
     }
-    // 일반과일 선택 시 호출
+
+
+    // ── 옵션 팝업 호출 메서드 ────────────────────────────────────
+
+    /// <summary>일반과일 선택 시 호출</summary>
     public void OpenFruitOption(string name, int price)
     {
         SetupOption(ProductCategory.Fruit, name, price, true, true, false, false);
     }
-    // 컵과일 선택 시 호출
+
+    /// <summary>컵과일 선택 시 호출</summary>
     public void OpenCupOption(string name, int price)
     {
         SetupOption(ProductCategory.Cup, name, price, true, false, true, false);
     }
-    // 선물세트 선택 시 호출
+
+    /// <summary>선물세트 선택 시 호출</summary>
     public void OpenGiftOption(string name, int price)
     {
         SetupOption(ProductCategory.Gift, name, price, true, false, false, true);
@@ -187,7 +234,7 @@ public class Script2_ProductManager : MonoBehaviour
         SetActive(packGroup, showPack);
 
         RefreshOptionUI();
-        panelManager.OpenPopup(panelManager.optionPopup);
+        //panelManager.OpenPopup(panelManager.optionPopup);
     }
 
     // 수량 변경, 최소 1개 유지
@@ -197,7 +244,7 @@ public class Script2_ProductManager : MonoBehaviour
         RefreshOptionUI();
     }
 
-    private void SetSize(string value) { size = value; RefreshOptionUI(); }
+    private void SetSize(string value) { size = value; RefreshOptionUI(); } //size 변수값 바꿈, 현재 옵션 요약 다시 그림, 가격 다시 계산, 화면 텍스트 다시 갱신
     private void SetSweetness(string value) { sweetness = value; RefreshOptionUI(); }
     private void SetComposition(string value) { composition = value; RefreshOptionUI(); }
     private void SetPackage(string value) { packageType = value; RefreshOptionUI(); }
@@ -274,7 +321,7 @@ public class Script2_ProductManager : MonoBehaviour
 
         RefreshCartPanel();
         RefreshCartPopup();
-        panelManager.ClosePopup(panelManager.optionPopup);
+        //panelManager.ClosePopup(panelManager.optionPopup);
     }
     // ProductPanel의 장바구니 요약 갱신
     public void RefreshCartPanel()

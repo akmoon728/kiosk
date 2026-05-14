@@ -87,8 +87,8 @@ public class Script3_PaymentManager : MonoBehaviour
         AddClick(paymentNextBtn, OpenPaymentGuidePopup);
         AddClick(paymentGuideConfirmBtn, FinalizePayment);
         AddClick(orderConfirmBtn, OpenPaymentGuidePopup);
-        AddClick(backBtn, panelManager.GoToProduct);
-        AddClick(receiptBtn, () => panelManager.OpenPopup(panelManager.receiptPopup));
+        AddClick(backBtn, () => panelManager.GoToProduct());
+        //AddClick(receiptBtn, () => panelManager.OpenPopup(panelManager.receiptPopup));
         AddClick(homeBtn, GoHome);
     }
 
@@ -143,7 +143,7 @@ public class Script3_PaymentManager : MonoBehaviour
     {
         ClearRows(orderRows);
         BuildOrderPopup();
-        panelManager.OpenPopup(panelManager.orderListPopup);
+        //panelManager.OpenPopup(panelManager.orderListPopup);
     }
 
     // 주문목록 팝업 안에 현재 장바구니 정보를 표시
@@ -211,7 +211,7 @@ public class Script3_PaymentManager : MonoBehaviour
             }
         }
 
-        panelManager.OpenPopup(panelManager.paymentGuidePopup);
+        //panelManager.OpenPopup(panelManager.paymentGuidePopup);
     }
 
     /// <summary>
@@ -219,8 +219,8 @@ public class Script3_PaymentManager : MonoBehaviour
     /// </summary>
     private void FinalizePayment()
     {
-        panelManager.ClosePopup(panelManager.paymentGuidePopup);
-        panelManager.ClosePopup(panelManager.orderListPopup);
+        //panelManager.ClosePopup(panelManager.paymentGuidePopup);
+        //panelManager.ClosePopup(panelManager.orderListPopup);
 
         BuildReceipt();
 

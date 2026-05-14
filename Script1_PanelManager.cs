@@ -48,19 +48,19 @@ public class Script1_PanelManager : MonoBehaviour
     public Image cupTabBar;                // 컵과일 탭 인디케이터
     public Image giftTabBar;               // 선물세트 탭 인디케이터*/
 
-    [Header("팝업")]
+/*    [Header("팝업")]
     public GameObject optionPopup;         // 상품 옵션 팝업
     public GameObject cartListPopup;       // 장바구니 팝업
     public GameObject orderListPopup;      // 주문목록 팝업
     public GameObject receiptPopup;        // 영수증 팝업
-    public GameObject paymentGuidePopup;   // 결제 안내 팝업
+    public GameObject paymentGuidePopup;   // 결제 안내 팝업*/
 
-    [Header("팝업 닫기 버튼")]
+/*    [Header("팝업 닫기 버튼")]
     public Button optionPopupCloseBtn;
     public Button cartListPopupCloseBtn;
     public Button orderListPopupCloseBtn;
     public Button receiptPopupCloseBtn;
-    public Button paymentGuidePopupCloseBtn;
+    public Button paymentGuidePopupCloseBtn;*/
 
     [Header("이동 버튼")]
     public Button productNextBtn;          // Product -> Payment 이동 버튼
@@ -79,24 +79,24 @@ public class Script1_PanelManager : MonoBehaviour
     private static readonly Color ActiveColor = new Color(0.18f, 0.42f, 0.31f);
     private static readonly Color InactiveColor = new Color(0.55f, 0.55f, 0.55f);
 
-    private void Awake()
+    //private void Awake()
+    //{
+    //    SetGroup(false,
+    //        introPanel, startPanel, productPanel, paymentPanel, completePanel,
+    //        optionPopup, cartListPopup, orderListPopup, receiptPopup, paymentGuidePopup);
+    //}
+    private void SwitchTab(int v)
     {
-        SetGroup(false,
-            introPanel, startPanel, productPanel, paymentPanel, completePanel,
-            optionPopup, cartListPopup, orderListPopup, receiptPopup, paymentGuidePopup);
+    
     }
 
-    private void Start()
+    public void Start()
     {
         BindButtons();
         Show(introPanel);
         SwitchTab(0);
     }
 
-    private void SwitchTab(int v)
-    {
-        throw new NotImplementedException();
-    }
 
     /// <summary>
     /// 버튼 클릭 이벤트를 한 번에 연결한다.
@@ -118,16 +118,16 @@ public class Script1_PanelManager : MonoBehaviour
         AddClick(productNextBtn, GoToPayment);
         AddClick(goPayBtn, GoToPayment);
         AddClick(payBackBtn, GoToProduct);
-        AddClick(viewCartBtn, () => OpenPopup(cartListPopup));
-        AddClick(receiptBtn, () => OpenPopup(receiptPopup));
-        AddClick(homeBtn, GoToIntro);
+        //AddClick(viewCartBtn, () => OpenPopup(cartListPopup));
+        //AddClick(receiptBtn, () => OpenPopup(receiptPopup));
+        //AddClick(homeBtn, GoToIntro);
         AddClick(completeNextBtn, GoToIntro);
-        // 팝업 닫기 버튼 연결
+        /*// 팝업 닫기 버튼 연결
         AddClick(optionPopupCloseBtn, () => ClosePopup(optionPopup));
         AddClick(cartListPopupCloseBtn, () => ClosePopup(cartListPopup));
         AddClick(orderListPopupCloseBtn, () => ClosePopup(orderListPopup));
         AddClick(receiptPopupCloseBtn, () => ClosePopup(receiptPopup));
-        AddClick(paymentGuidePopupCloseBtn, () => ClosePopup(paymentGuidePopup));
+        AddClick(paymentGuidePopupCloseBtn, () => ClosePopup(paymentGuidePopup));*/
     }
 
     /// <summary>
@@ -176,8 +176,8 @@ public class Script1_PanelManager : MonoBehaviour
         SetTabColor(tabGift, index == 2);
     }*/
     // 공통 팝업 열기/닫기
-    public void OpenPopup(GameObject popup) => SetActive(popup, true);
-    public void ClosePopup(GameObject popup) => SetActive(popup, false);
+ /*   public void OpenPopup(GameObject popup) => SetActive(popup, true);
+    public void ClosePopup(GameObject popup) => SetActive(popup, false);*/
 
     private void AddClick(Button button, UnityEngine.Events.UnityAction action)
     {
