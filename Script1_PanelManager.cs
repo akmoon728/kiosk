@@ -1,248 +1,201 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// ================================================================
-//  Script 1 : PanelManager.cs
-//  [ 패널 전환 + 카테고리 탭 전환 + 팝업창 전환 ]
-//
-//  담당 역할:
-//  - 메인 패널 4개 Show/Hide 전환
-//  - ProductPanel 안의 카테고리 탭 전환 (일반/컵/선물세트)
-//  - 팝업창(옵션 팝업, 구매목록 팝업, 영수증 팝업) 열기/닫기
-//
-//  다른 스크립트 참조:
-//  - ProductManager.cs  : 상품 추가/옵션 기능
-//  - PaymentManager.cs  : 결제 기능
-// ================================================================
-public class PanelManager : MonoBehaviour
+/// <summary>
+/// Script1_PanelManager.cs 스타일 정리 버전
+/// - Intro / Start / Product / Payment / Complete 패널 전환 관리
+/// - 일반과일 / 컵과일 / 선물세트 탭 전환 관리
+/// - 옵션 / 장바구니 / 주문목록 / 영수증 / 결제안내 팝업 열기/닫기 관리
+/// - 각 페이지의 다음 단계 이동 버튼 관리
+/// 
+/// 연결 예시
+// - IntroPanel 의 시작하기 버튼 -> startIntroBtn 또는 introNextBtn
+// - StartPanel 의 픽업/배송 선택 후 다음 버튼 -> startNextBtn
+// - ProductPanel 의 결제하기 버튼 -> productNextBtn 또는 goPayBtn
+// - PaymentPanel 의 결제 버튼 -> paymentNextBtn 또는 confirmBtn
+/// </summary>
+public class Script1_PanelManager : MonoBehaviour
 {
-    // ──────────────────────────────────────────────────────────
-    //  메인 패널 4개
-    //  Inspector에서 Canvas 자식 패널 4개를 각각 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 메인 패널 =====")]
-    public GameObject startPanel;       // 시작화면 (픽업/배송 선택)
-    public GameObject productPanel;     // 상품 선택 화면
-    public GameObject paymentPanel;     // 결제 화면
-    public GameObject completePanel;    // 주문 완료 화면
+    [Header("메인 패널")]
+    public GameObject introPanel;          // 첫 시작 화면
+    public GameObject startPanel;          // 픽업 / 배송 선택 화면
+    public GameObject productPanel;        // 상품 선택 화면
+    public GameObject paymentPanel;        // 결제 화면
+    public GameObject completePanel;       // 결제 완료 화면
 
-    // ──────────────────────────────────────────────────────────
-    //  StartPanel 버튼
-    //  Inspector: StartPanel 안의 버튼 2개 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== StartPanel 버튼 =====")]
-    public Button pickupBtn;            // 픽업 선택 → ProductPanel 이동
-    public Button deliveryBtn;          // 배송 선택 → ProductPanel 이동
+    [Header("인트로")]
+    public Button startIntroBtn;           // IntroPanel 시작하기 버튼
+    public Button introNextBtn;            // IntroPanel 다음 버튼(선택사항)
 
-    // ──────────────────────────────────────────────────────────
-    //  카테고리 탭 버튼
-    //  Inspector: ProductPanel > LeftCategoryMenu 안의 버튼 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 카테고리 탭 버튼 =====")]
-    public Button tabFruit;             // 일반과일 탭 버튼
-    public Button tabCup;               // 컵과일 탭 버튼
-    public Button tabGift;              // 선물세트 탭 버튼
+    [Header("시작 화면")]
+    public Button pickupBtn;               // 픽업 선택 버튼
+    public Button deliveryBtn;             // 배송 선택 버튼
+    public Button startNextBtn;            // 상품 화면으로 이동하는 다음 버튼
 
-    // ──────────────────────────────────────────────────────────
-    //  카테고리별 상품 그리드
-    //  Inspector: ProductPanel > MainContent 안의 Grid 3개 연결
-    //  각 Grid는 해당 카테고리 상품 카드 버튼들을 담고 있음
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 카테고리 그리드 =====")]
-    public GameObject gridFruit;        // 일반과일 상품 카드 그룹
-    public GameObject gridCup;          // 컵과일 상품 카드 그룹
-    public GameObject gridGift;         // 선물세트 상품 카드 그룹
+    [Header("카테고리 탭")]
+    public Button tabFruit;                // 일반과일 탭
+    public Button tabCup;                  // 컵과일 탭
+    public Button tabGift;                 // 선물세트 탭
 
-    // ──────────────────────────────────────────────────────────
-    //  탭 선택 인디케이터 (선택된 탭 강조 표시)
-    //  Inspector: 각 탭 버튼 아래에 있는 초록 바 Image 연결
-    //  없으면 비워둬도 됨
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 탭 인디케이터 (선택사항) =====")]
-    public Image fruitTabBar;           // 일반과일 탭 선택 표시 바
-    public Image cupTabBar;             // 컵과일 탭 선택 표시 바
-    public Image giftTabBar;            // 선물세트 탭 선택 표시 바
+    [Header("카테고리 패널")]
+    public GameObject gridFruit;           // 일반과일 목록 영역
+    public GameObject gridCup;             // 컵과일 목록 영역
+    public GameObject gridGift;            // 선물세트 목록 영역
 
-    // ──────────────────────────────────────────────────────────
-    //  팝업창 3개
-    //  Inspector: Canvas 맨 아래에 배치한 팝업 패널 연결
-    //  모두 기본 SetActive(false) 상태로 시작
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 팝업창 =====")]
-    public GameObject optionPopup;      // 상품 클릭 시 옵션 선택 팝업
-    public GameObject cartListPopup;    // "구매목록 보기" 팝업
-    public GameObject receiptPopup;     // CompletePanel 영수증 팝업
+    /*[Header("탭 인디케이터")]
+    public Image fruitTabBar;              // 일반과일 탭 인디케이터
+    public Image cupTabBar;                // 컵과일 탭 인디케이터
+    public Image giftTabBar;               // 선물세트 탭 인디케이터*/
 
-    // ──────────────────────────────────────────────────────────
-    //  팝업 닫기 버튼
-    //  Inspector: 각 팝업 안의 닫기(X) 버튼 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 팝업 닫기 버튼 =====")]
-    public Button optionPopupCloseBtn;  // 옵션 팝업 닫기
-    public Button cartListPopupCloseBtn;// 구매목록 팝업 닫기
-    public Button receiptPopupCloseBtn; // 영수증 팝업 닫기
+    [Header("팝업")]
+    public GameObject optionPopup;         // 상품 옵션 팝업
+    public GameObject cartListPopup;       // 장바구니 팝업
+    public GameObject orderListPopup;      // 주문목록 팝업
+    public GameObject receiptPopup;        // 영수증 팝업
+    public GameObject paymentGuidePopup;   // 결제 안내 팝업
 
-    // ──────────────────────────────────────────────────────────
-    //  RightCartPanel 버튼
-    //  Inspector: ProductPanel > RightCartPanel 안의 버튼 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 장바구니 버튼 =====")]
-    public Button goPayBtn;             // "결제하기" → PaymentPanel 이동
-    public Button viewCartBtn;          // "구매목록 보기" → cartListPopup 열기
+    [Header("팝업 닫기 버튼")]
+    public Button optionPopupCloseBtn;
+    public Button cartListPopupCloseBtn;
+    public Button orderListPopupCloseBtn;
+    public Button receiptPopupCloseBtn;
+    public Button paymentGuidePopupCloseBtn;
 
-    // ──────────────────────────────────────────────────────────
-    //  CompletePanel 버튼
-    // ──────────────────────────────────────────────────────────
-    [Header("===== CompletePanel 버튼 =====")]
-    public Button receiptBtn;           // "영수증 보기" → receiptPopup 열기
-    public Button homeBtn;              // "홈으로" → StartPanel 이동
+    [Header("이동 버튼")]
+    public Button productNextBtn;          // Product -> Payment 이동 버튼
+    public Button goPayBtn;                // Product -> Payment 이동 버튼(대체용)
+    public Button viewCartBtn;             // 장바구니 팝업 열기 버튼
+    public Button payBackBtn;              // Payment -> Product 뒤로가기
+    public Button receiptBtn;              // 영수증 팝업 열기 버튼
+    public Button homeBtn;                 // 첫 화면으로 이동 버튼
+    public Button completeNextBtn;         // 완료 후 다시 첫 화면 이동 버튼
 
-    // ──────────────────────────────────────────────────────────
-    //  PaymentPanel 뒤로가기
-    // ──────────────────────────────────────────────────────────
-    [Header("===== PaymentPanel 버튼 =====")]
-    public Button payBackBtn;           // "뒤로" → ProductPanel 이동
+    [Header("외부 참조")]
+    public Commented_Optimized_PaymentManager_v4 paymentManager; // 결제화면 진입 시 정보 갱신용 참조
 
-    // ── 색상 상수 ─────────────────────────────────────────────
-    private static readonly Color COL_ACTIVE   = new Color(0.18f, 0.42f, 0.31f); // 초록
-    private static readonly Color COL_INACTIVE = new Color(0.55f, 0.55f, 0.55f); // 회색
+    [HideInInspector] public string deliveryMethod = "pickup";  // 픽업 또는 배송 저장
 
-    // 배송 방법 저장 (ProductManager, PaymentManager에서 접근 가능)
-    [HideInInspector] public string deliveryMethod = "pickup";
+    private static readonly Color ActiveColor = new Color(0.18f, 0.42f, 0.31f);
+    private static readonly Color InactiveColor = new Color(0.55f, 0.55f, 0.55f);
 
-    // =========================================================
-    //  Awake: 모든 패널/팝업 먼저 비활성화
-    //  Start보다 먼저 실행되어 깜빡임 방지
-    // =========================================================
-    void Awake()
+    private void Awake()
     {
-        // 메인 패널 전부 끄기
-        startPanel.SetActive(false);
-        productPanel.SetActive(false);
-        paymentPanel.SetActive(false);
-        completePanel.SetActive(false);
-
-        // 팝업 전부 끄기
-        if (optionPopup)    optionPopup.SetActive(false);
-        if (cartListPopup)  cartListPopup.SetActive(false);
-        if (receiptPopup)   receiptPopup.SetActive(false);
+        SetGroup(false,
+            introPanel, startPanel, productPanel, paymentPanel, completePanel,
+            optionPopup, cartListPopup, orderListPopup, receiptPopup, paymentGuidePopup);
     }
 
-    // =========================================================
-    //  Start: 버튼 이벤트 연결 및 초기 화면 설정
-    // =========================================================
-    void Start()
+    private void Start()
     {
-        // ── StartPanel 버튼 연결 ──────────────────────────────
-        // 픽업 선택 시 deliveryMethod 저장 후 ProductPanel 이동
-        pickupBtn.onClick.AddListener(() =>
-        {
-            deliveryMethod = "pickup";
-            Show(productPanel);
-        });
-
-        // 배송 선택 시 deliveryMethod 저장 후 ProductPanel 이동
-        deliveryBtn.onClick.AddListener(() =>
-        {
-            deliveryMethod = "delivery";
-            Show(productPanel);
-        });
-
-        // ── 카테고리 탭 버튼 연결 ────────────────────────────
-        tabFruit.onClick.AddListener(() => SwitchTab(0)); // 일반과일
-        tabCup.onClick.AddListener(  () => SwitchTab(1)); // 컵과일
-        tabGift.onClick.AddListener( () => SwitchTab(2)); // 선물세트
-
-        // ── 장바구니 버튼 연결 ───────────────────────────────
-        // 결제하기 버튼: ProductPanel → PaymentPanel
-        goPayBtn.onClick.AddListener(() => Show(paymentPanel));
-
-        // 구매목록 보기: cartListPopup 열기
-        if (viewCartBtn)
-            viewCartBtn.onClick.AddListener(() => OpenPopup(cartListPopup));
-
-        // ── PaymentPanel 뒤로 버튼 ───────────────────────────
-        payBackBtn.onClick.AddListener(() => Show(productPanel));
-
-        // ── CompletePanel 버튼 연결 ──────────────────────────
-        // 영수증 보기: receiptPopup 열기
-        receiptBtn.onClick.AddListener(() => OpenPopup(receiptPopup));
-
-        // 홈으로: StartPanel 이동
-        homeBtn.onClick.AddListener(() => Show(startPanel));
-
-        // ── 팝업 닫기 버튼 연결 ──────────────────────────────
-        if (optionPopupCloseBtn)
-            optionPopupCloseBtn.onClick.AddListener(() => ClosePopup(optionPopup));
-        if (cartListPopupCloseBtn)
-            cartListPopupCloseBtn.onClick.AddListener(() => ClosePopup(cartListPopup));
-        if (receiptPopupCloseBtn)
-            receiptPopupCloseBtn.onClick.AddListener(() => ClosePopup(receiptPopup));
-
-        // ── 초기 화면: StartPanel 표시 ───────────────────────
-        Show(startPanel);
-        SwitchTab(0); // 첫 탭은 일반과일
+        BindButtons();
+        Show(introPanel);
+        SwitchTab(0);
     }
 
-    // =========================================================
-    //  메인 패널 전환
-    //  target 패널만 켜고 나머지는 전부 끔
-    // =========================================================
+    /// <summary>
+    /// 버튼 클릭 이벤트를 한 번에 연결한다.
+    /// </summary>
+    private void BindButtons()
+    {
+        AddClick(startIntroBtn, GoToStart);
+        AddClick(introNextBtn, GoToStart);
+        // 픽업/배송 버튼은 deliveryMethod 값만 변경
+        AddClick(pickupBtn, () => deliveryMethod = "pickup");
+        AddClick(deliveryBtn, () => deliveryMethod = "delivery");
+        // 시작 화면 다음 버튼
+        AddClick(startNextBtn, GoToProduct);
+        // 카테고리 탭 버튼 연결
+        AddClick(tabFruit, () => SwitchTab(0));
+        AddClick(tabCup, () => SwitchTab(1));
+        AddClick(tabGift, () => SwitchTab(2));
+        // 페이지 이동 버튼 연결
+        AddClick(productNextBtn, GoToPayment);
+        AddClick(goPayBtn, GoToPayment);
+        AddClick(payBackBtn, GoToProduct);
+        AddClick(viewCartBtn, () => OpenPopup(cartListPopup));
+        AddClick(receiptBtn, () => OpenPopup(receiptPopup));
+        AddClick(homeBtn, GoToIntro);
+        AddClick(completeNextBtn, GoToIntro);
+        // 팝업 닫기 버튼 연결
+        AddClick(optionPopupCloseBtn, () => ClosePopup(optionPopup));
+        AddClick(cartListPopupCloseBtn, () => ClosePopup(cartListPopup));
+        AddClick(orderListPopupCloseBtn, () => ClosePopup(orderListPopup));
+        AddClick(receiptPopupCloseBtn, () => ClosePopup(receiptPopup));
+        AddClick(paymentGuidePopupCloseBtn, () => ClosePopup(paymentGuidePopup));
+    }
+
+    /// <summary>
+    /// 전달된 패널만 활성화하고 나머지 메인 패널은 비활성화한다.
+    /// </summary>
     public void Show(GameObject target)
     {
-        startPanel.SetActive(   target == startPanel);
-        productPanel.SetActive( target == productPanel);
-        paymentPanel.SetActive( target == paymentPanel);
-        completePanel.SetActive(target == completePanel);
+        SetActive(introPanel, target == introPanel);
+        SetActive(startPanel, target == startPanel);
+        SetActive(productPanel, target == productPanel);
+        SetActive(paymentPanel, target == paymentPanel);
+        SetActive(completePanel, target == completePanel);
     }
 
-    // =========================================================
-    //  카테고리 탭 전환
-    //  idx: 0=일반과일, 1=컵과일, 2=선물세트
-    // =========================================================
-    public void SwitchTab(int idx)
+    public void GoToIntro() => Show(introPanel);
+    public void GoToStart() => Show(startPanel);
+    public void GoToProduct() => Show(productPanel);
+
+    /// <summary>
+    /// 결제 화면으로 이동하면서 결제 정보도 갱신한다.
+    /// </summary>
+    public void GoToPayment()
     {
-        // 해당 탭의 그리드만 활성화
-        gridFruit.SetActive(idx == 0);
-        gridCup.SetActive(  idx == 1);
-        gridGift.SetActive( idx == 2);
-
-        // 인디케이터 바 전환 (연결했을 때만)
-        if (fruitTabBar) fruitTabBar.gameObject.SetActive(idx == 0);
-        if (cupTabBar)   cupTabBar.gameObject.SetActive(  idx == 1);
-        if (giftTabBar)  giftTabBar.gameObject.SetActive( idx == 2);
-
-        // 탭 버튼 텍스트 컬러 변경
-        SetTabColor(tabFruit, idx == 0);
-        SetTabColor(tabCup,   idx == 1);
-        SetTabColor(tabGift,  idx == 2);
+        Show(paymentPanel);
+        paymentManager?.OnEnterPayment();
     }
 
-    // =========================================================
-    //  팝업 열기
-    //  팝업 오브젝트를 활성화
-    // =========================================================
-    public void OpenPopup(GameObject popup)
+    public void GoToComplete() => Show(completePanel);
+
+    /// <summary>
+    /// 카테고리 탭을 전환한다.
+    /// 0 = 일반과일, 1 = 컵과일, 2 = 선물세트
+    /// </summary>
+    public void SwitchTab(int index)
     {
-        if (popup != null) popup.SetActive(true);
+        SetActive(gridFruit, index == 0);
+        SetActive(gridCup, index == 1);
+        SetActive(gridGift, index == 2);
+        // 선택된 탭만 인디케이터 표시
+        SetIndicator(fruitTabBar, index == 0);
+        SetIndicator(cupTabBar, index == 1);
+        SetIndicator(giftTabBar, index == 2);
+        // 선택된 탭만 강조 색상 적용
+        SetTabColor(tabFruit, index == 0);
+        SetTabColor(tabCup, index == 1);
+        SetTabColor(tabGift, index == 2);
+    }
+    // 공통 팝업 열기/닫기
+    public void OpenPopup(GameObject popup) => SetActive(popup, true);
+    public void ClosePopup(GameObject popup) => SetActive(popup, false);
+
+    private void AddClick(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button != null) button.onClick.AddListener(action);
     }
 
-    // =========================================================
-    //  팝업 닫기
-    //  팝업 오브젝트를 비활성화
-    // =========================================================
-    public void ClosePopup(GameObject popup)
+    private void SetIndicator(Image image, bool visible)
     {
-        if (popup != null) popup.SetActive(false);
+        if (image != null) image.gameObject.SetActive(visible);
     }
 
-    // =========================================================
-    //  탭 버튼 텍스트 컬러 변경 헬퍼
-    //  활성 탭은 초록, 비활성 탭은 회색
-    // =========================================================
-    private void SetTabColor(Button btn, bool isActive)
+    private void SetTabColor(Button button, bool isActive)
     {
-        var label = btn?.GetComponentInChildren<Text>();
-        if (label) label.color = isActive ? COL_ACTIVE : COL_INACTIVE;
+        var label = button ? button.GetComponentInChildren<Text>() : null;
+        if (label != null) label.color = isActive ? ActiveColor : InactiveColor;
+    }
+
+    private void SetGroup(bool active, params GameObject[] objects)
+    {
+        foreach (var obj in objects) SetActive(obj, active);
+    }
+
+    private void SetActive(GameObject obj, bool active)
+    {
+        if (obj != null) obj.SetActive(active);
     }
 }
