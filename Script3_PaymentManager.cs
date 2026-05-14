@@ -1,318 +1,299 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// ================================================================
-//  Script 3 : PaymentManager.cs
-//  [ 결제 처리 + 결제목록 팝업 + 영수증 팝업 ]
-//
-//  담당 역할:
-//  - 결제 방법 선택 (카드/현금/포인트)
-//  - 결제 확인 → CompletePanel 이동
-//  - 결제목록 팝업: 결제 전 최종 확인 팝업
-//  - 영수증 팝업: 결제 완료 후 영수증 표시
-//  - 홈으로: 장바구니 초기화 + StartPanel 이동
-// ================================================================
-public class PaymentManager : MonoBehaviour
+/// <summary>
+/// Script3_PaymentManager.cs 스타일 정리 버전
+/// - 카드 / 포인트 / 애플페이 / 삼성페이 선택
+/// - 주문목록 팝업 생성
+/// - 결제안내 팝업 생성
+/// - 결제 완료 후 완료 패널 이동
+/// - 영수증 생성
+/// 
+// 결제 흐름
+// 1) 결제수단 선택
+// 2) 결제 버튼 클릭
+// 3) 결제안내 팝업 표시
+// 4) 안내 팝업에서 확인
+// 5) CompletePanel 이동
+/// </summary>
+public class Script3_PaymentManager : MonoBehaviour
 {
-    // ──────────────────────────────────────────────────────────
-    //  PanelManager, ProductManager 참조
-    //  Inspector: KioskController 오브젝트에서 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 매니저 참조 =====")]
-    public PanelManager  panelManager;     // 패널/팝업 전환
-    public ProductManager productManager;  // 장바구니 데이터 접근
+    [Header("외부 참조")]
+    public Commented_Optimized_PanelManager_v4 panelManager;     // 패널/팝업 전환용
+    public Commented_Optimized_ProductManager_v4 productManager; // 장바구니 데이터 참조용
 
-    // ──────────────────────────────────────────────────────────
-    //  PaymentPanel 내부 UI
-    //  Inspector: PaymentPanel 안의 UI 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== PaymentPanel UI =====")]
-    public Button cardBtn;                 // 카드 결제 선택 버튼
-    public Button cashBtn;                 // 현금 결제 선택 버튼
-    public Button pointBtn;                // 포인트 결제 선택 버튼
+    [Header("결제 UI")]
+    public Button cardBtn;            // 카드 결제 버튼
+    public Button pointBtn;           // 포인트 결제 버튼
+    public Button applePayBtn;        // 애플페이 버튼
+    public Button samsungPayBtn;      // 삼성페이 버튼
+    public Text payAmountText;        // 결제금액 표시 텍스트
+    public Button viewOrderBtn;       // 주문목록 보기 버튼
+    public Button confirmBtn;         // 결제 진행 버튼
+    public Button backBtn;            // 상품 화면으로 돌아가기 버튼
+    public Button paymentNextBtn;     // confirmBtn 대체용 다음 버튼
 
-    // 선택된 결제방법 강조 표시용 테두리 Image
-    // Inspector: 각 버튼 안의 Border Image 연결
-    public Image  cardBorderImg;
-    public Image  cashBorderImg;
-    public Image  pointBorderImg;
+    /*[Header("선택 표시 이미지")]
+    public Image cardSelectImg;       // 카드 선택 강조 이미지
+    public Image pointSelectImg;      // 포인트 선택 강조 이미지
+    public Image applePaySelectImg;   // 애플페이 선택 강조 이미지
+    public Image samsungPaySelectImg; // 삼성페이 선택 강조 이미지*/
 
-    public Text   payAmountText;           // "결제금액: 12,000원"
-    public Button viewOrderBtn;            // "결제 목록 확인" → 결제목록 팝업 열기
-    public Button confirmBtn;             // "결제하기" → CompletePanel 이동
-    public Button backBtn;                 // "뒤로" → ProductPanel 이동
+    [Header("결제 안내 팝업")]
+    public Text paymentGuideTitleText;    // 팝업 제목
+    public Text paymentGuideMessageText;  // 팝업 안내 문구
+    public Button paymentGuideConfirmBtn; // 팝업 확인 버튼
 
-    // ──────────────────────────────────────────────────────────
-    //  결제목록 팝업 내부 UI
-    //  결제 전 최종 주문 확인 팝업
-    //
-    //  OrderListPopup 구조:
-    //  OrderListPopup
-    //  ├ TitleText        "최종 주문 확인"
-    //  ├ DeliveryText     ← orderDeliveryText
-    //  ├ ScrollView
-    //  │  └ Content       ← orderListContent
-    //  ├ TotalText        ← orderTotalText
-    //  ├ PayMethodText    ← orderPayMethodText
-    //  ├ ConfirmButton    ← orderConfirmBtn (여기서 최종 결제)
-    //  └ CloseButton      ← PanelManager.ClosePopup
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 결제목록 팝업 내부 UI =====")]
-    public GameObject orderListPopup;      // 결제목록 팝업 오브젝트
-    public Text       orderDeliveryText;   // "수령방법: 픽업" 텍스트
-    public Transform  orderListContent;    // 주문 목록 Content (동적 생성 위치)
-    public Text       orderTotalText;      // "합계: N원"
-    public Text       orderPayMethodText;  // "결제방법: 카드"
-    public Button     orderConfirmBtn;     // 팝업 안 "결제 확인" 버튼
-    public Button     orderCloseBtn;       // 팝업 닫기 버튼
-    public GameObject orderRowPrefab;      // 목록 한 줄 프리팹
+    [Header("주문목록 팝업")]
+    public Text orderDeliveryText;    // 수령방법(픽업/배송)
+    public Transform orderListContent;// 주문 목록 생성 위치
+    public Text orderTotalText;       // 총 결제금액
+    public Text orderPayMethodText;   // 선택된 결제수단
+    public Button orderConfirmBtn;    // 주문목록 팝업 내 결제 버튼
+    public GameObject orderRowPrefab; // 주문 항목 프리팹
 
-    // ──────────────────────────────────────────────────────────
-    //  영수증 팝업 내부 UI
-    //  CompletePanel에서 "영수증 보기" 클릭 시 열림
-    //
-    //  ReceiptPopup 구조:
-    //  ReceiptPopup
-    //  ├ ReceiptContentText  ← receiptContentText
-    //  └ CloseButton
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 영수증 팝업 내부 UI =====")]
-    public Text   receiptContentText;      // 영수증 전체 내용 텍스트
+    [Header("완료 / 영수증")]
+    public Text successText;          // 완료 메시지
+    public Text receiptContentText;   // 영수증 내용
+    public Button receiptBtn;         // 영수증 팝업 버튼
+    public Button homeBtn;            // 홈으로 이동 버튼;
 
-    // ──────────────────────────────────────────────────────────
-    //  CompletePanel UI
-    // ──────────────────────────────────────────────────────────
-    [Header("===== CompletePanel UI =====")]
-    public Text   successText;             // "주문 완료! 🍎"
-    public Button homeBtn;                 // "홈으로" 버튼
+    private readonly List<GameObject> orderRows = new();
+    private string payMethod = string.Empty;     // 현재 선택한 결제수단
 
-    // ── 색상 상수 ─────────────────────────────────────────────
-    private static readonly Color COL_SELECTED   = new Color(0.18f, 0.42f, 0.31f); // 선택 초록
-    private static readonly Color COL_UNSELECTED = new Color(0f, 0f, 0f, 0f);      // 투명 (미선택)
+    private static readonly Color SelectedColor = new Color(0.18f, 0.42f, 0.31f, 1f);
+    private static readonly Color ClearColor = new Color(1f, 1f, 1f, 0f);
 
-    // ── 내부 상태 ─────────────────────────────────────────────
-    private string _payMethod = "";        // 선택된 결제 방법
-
-    // 생성된 주문목록 행 오브젝트 추적
-    private readonly System.Collections.Generic.List<GameObject> _orderRows
-        = new System.Collections.Generic.List<GameObject>();
-
-    // =========================================================
-    //  Start: 버튼 이벤트 연결
-    // =========================================================
-    void Start()
+    private void Start()
     {
-        // ── 결제 방법 버튼 ────────────────────────────────────
-        cardBtn.onClick.AddListener(  () => SelectPay("카드"));
-        cashBtn.onClick.AddListener(  () => SelectPay("현금"));
-        pointBtn.onClick.AddListener( () => SelectPay("포인트"));
-
-        // ── 결제목록 팝업 버튼 ───────────────────────────────
-        // "결제 목록 확인" 버튼: 팝업 열고 내용 갱신
-        if (viewOrderBtn)
-            viewOrderBtn.onClick.AddListener(OpenOrderListPopup);
-
-        // 팝업 안 "결제 확인" 버튼: 실제 결제 실행
-        if (orderConfirmBtn)
-            orderConfirmBtn.onClick.AddListener(Confirm);
-
-        // 팝업 닫기 버튼
-        if (orderCloseBtn)
-            orderCloseBtn.onClick.AddListener(() =>
-                panelManager.ClosePopup(orderListPopup));
-
-        // ── 결제하기 / 뒤로가기 버튼 ─────────────────────────
-        confirmBtn.onClick.AddListener(Confirm);
-        backBtn.onClick.AddListener(   () => panelManager.Show(panelManager.productPanel));
-
-        // ── CompletePanel 버튼 ───────────────────────────────
-        // 홈으로: 장바구니 초기화 후 StartPanel 이동
-        homeBtn.onClick.AddListener(GoHome);
-
-        // ── 초기 상태 ─────────────────────────────────────────
-        confirmBtn.interactable = false; // 결제방법 미선택 시 비활성
+        BindButtons();
+        ResetPaymentState();
     }
 
-    // =========================================================
-    //  PaymentPanel 진입 시 호출
-    //  PanelManager.Show(paymentPanel) 뒤에 호출 필요
-    //  또는 PanelManager.Show()에서 자동 호출하도록 연결
-    // =========================================================
+    /// <summary>
+    /// 결제 관련 버튼 이벤트를 연결한다.
+    /// </summary>
+    private void BindButtons()
+    {
+        AddClick(cardBtn, () => SelectPay("카드"));
+        AddClick(pointBtn, () => SelectPay("포인트"));
+        AddClick(applePayBtn, () => SelectPay("애플페이"));
+        AddClick(samsungPayBtn, () => SelectPay("삼성페이"));
+
+        AddClick(viewOrderBtn, OpenOrderPopup);
+        AddClick(confirmBtn, OpenPaymentGuidePopup);
+        AddClick(paymentNextBtn, OpenPaymentGuidePopup);
+        AddClick(paymentGuideConfirmBtn, FinalizePayment);
+        AddClick(orderConfirmBtn, OpenPaymentGuidePopup);
+        AddClick(backBtn, panelManager.GoToProduct);
+        AddClick(receiptBtn, () => panelManager.OpenPopup(panelManager.receiptPopup));
+        AddClick(homeBtn, GoHome);
+    }
+
+    /// <summary>
+    /// 결제 화면 진입 시 결제 상태와 결제금액을 초기화한다.
+    /// </summary>
     public void OnEnterPayment()
     {
-        // 결제 방법 초기화
-        _payMethod = "";
-        ClearPayBorders();
-        confirmBtn.interactable = false;
-
-        // 결제금액 최신 합계로 표시
-        int total = GetTotal();
-        payAmountText.text = $"결제금액: {total:N0}원";
+        ResetPaymentState();
+        if (payAmountText != null)
+            payAmountText.text = $"결제금액: {GetCartTotal():N0}원";
     }
 
-    // =========================================================
-    //  결제 방법 선택
-    //  선택된 버튼 테두리를 초록으로 강조
-    // =========================================================
+    // 결제수단 선택 상태 초기화
+    private void ResetPaymentState()
+    {
+        payMethod = string.Empty;
+        if (confirmBtn != null) confirmBtn.interactable = false;
+        ClearSelectImages();
+    }
+
+    /// <summary>
+    /// 결제수단을 선택하고 선택 표시를 갱신한다.
+    /// </summary>
     private void SelectPay(string method)
     {
-        _payMethod = method;
+        payMethod = method;
+        if (confirmBtn != null) confirmBtn.interactable = true;
 
-        // 모든 테두리 초기화 후 선택된 것만 강조
-        ClearPayBorders();
-        switch (method)
-        {
-            case "카드":
-                if (cardBorderImg)  cardBorderImg.color  = COL_SELECTED; break;
-            case "현금":
-                if (cashBorderImg)  cashBorderImg.color  = COL_SELECTED; break;
-            case "포인트":
-                if (pointBorderImg) pointBorderImg.color = COL_SELECTED; break;
-        }
-
-        // 결제방법 선택 시 결제 버튼 활성화
-        confirmBtn.interactable = true;
+        ClearSelectImages();
+        SetSelectImage(method);
     }
 
-    // =========================================================
-    //  결제목록 팝업 열기
-    //  최종 주문 내역 + 결제방법 표시
-    // =========================================================
-    private void OpenOrderListPopup()
+    // 선택한 결제수단의 강조 이미지 활성화
+    private void SetSelectImage(string method)
     {
-        // 기존 목록 삭제
-        foreach (var row in _orderRows) Destroy(row);
-        _orderRows.Clear();
-
-        // 수령방법 표시
-        if (orderDeliveryText)
-            orderDeliveryText.text =
-                $"수령방법: {(panelManager.deliveryMethod == "pickup" ? "픽업" : "배송")}";
-
-        // 결제방법 표시
-        if (orderPayMethodText)
-            orderPayMethodText.text =
-                $"결제방법: {(string.IsNullOrEmpty(_payMethod) ? "미선택" : _payMethod)}";
-
-        // 주문 목록 행 동적 생성
-        int total = 0;
-        if (orderListContent != null && orderRowPrefab != null)
-        {
-            foreach (var item in productManager.cart)
-            {
-                var row  = Instantiate(orderRowPrefab, orderListContent);
-                var txts = row.GetComponentsInChildren<Text>();
-
-                // 텍스트 인덱스 약속:
-                // 0 = 상품명, 1 = 가격
-                if (txts.Length > 0) txts[0].text = item.name;
-                if (txts.Length > 1) txts[1].text = $"{item.price:N0}원";
-
-                _orderRows.Add(row);
-                total += item.price;
-            }
-        }
-
-        // 합계 표시
-        if (orderTotalText)
-            orderTotalText.text = $"합계: {total:N0}원";
-
-        // 팝업 열기
-        panelManager.OpenPopup(orderListPopup);
+        if (method == "카드" && cardSelectImg != null) cardSelectImg.color = SelectedColor;
+        if (method == "포인트" && pointSelectImg != null) pointSelectImg.color = SelectedColor;
+        if (method == "애플페이" && applePaySelectImg != null) applePaySelectImg.color = SelectedColor;
+        if (method == "삼성페이" && samsungPaySelectImg != null) samsungPaySelectImg.color = SelectedColor;
     }
 
-    // =========================================================
-    //  결제 확인 (최종 결제 실행)
-    //  결제방법 미선택 시 실행 안 됨
-    // =========================================================
-    private void Confirm()
+    /// <summary>
+    /// 주문목록 팝업을 생성하고 연다.
+    /// </summary>
+    private void OpenOrderPopup()
     {
-        if (string.IsNullOrEmpty(_payMethod))
+        ClearRows(orderRows);
+        BuildOrderPopup();
+        panelManager.OpenPopup(panelManager.orderListPopup);
+    }
+
+    // 주문목록 팝업 안에 현재 장바구니 정보를 표시
+    private void BuildOrderPopup()
+    {
+        if (orderDeliveryText != null)
+            orderDeliveryText.text = $"수령방법: {(panelManager.deliveryMethod == "pickup" ? "픽업" : "배송")}";
+
+        if (orderPayMethodText != null)
+            orderPayMethodText.text = $"결제방법: {(string.IsNullOrEmpty(payMethod) ? "미선택" : payMethod)}";
+
+        if (orderListContent == null || orderRowPrefab == null)
         {
-            Debug.LogWarning("[결제] 결제방법을 먼저 선택하세요.");
+            if (orderTotalText != null) orderTotalText.text = $"합계: {GetCartTotal():N0}원";
             return;
         }
 
-        // 결제목록 팝업 닫기
-        panelManager.ClosePopup(orderListPopup);
+        int total = 0;
+        foreach (var item in productManager.cart)
+        {
+            var row = Instantiate(orderRowPrefab, orderListContent);
+            var texts = row.GetComponentsInChildren<Text>();
 
-        // 영수증 생성
-        BuildReceipt();
+            SetText(texts, 0, item.name);
+            SetText(texts, 1, item.OptionSummary());
+            SetText(texts, 2, $"{item.quantity}개");
+            SetText(texts, 3, $"{item.totalPrice:N0}원");
 
-        // CompletePanel로 이동
-        panelManager.Show(panelManager.completePanel);
+            orderRows.Add(row);
+            total += item.totalPrice;
+        }
 
-        // 완료 텍스트 설정
-        if (successText) successText.text = "주문 완료! 🍎";
+        if (orderTotalText != null) orderTotalText.text = $"합계: {total:N0}원";
     }
 
-    // =========================================================
-    //  영수증 텍스트 생성
-    //  CompletePanel 진입 시 receiptContentText에 내용 채움
-    // =========================================================
+    /// <summary>
+    /// 선택한 결제수단에 맞는 안내 팝업을 띄운다.
+    /// </summary>
+    private void OpenPaymentGuidePopup()
+    {
+        if (string.IsNullOrEmpty(payMethod)) return;
+
+        if (paymentGuideTitleText != null)
+            paymentGuideTitleText.text = $"{payMethod} 결제";
+
+        if (paymentGuideMessageText != null)
+        {
+            switch (payMethod)
+            {
+                case "카드":
+                    paymentGuideMessageText.text = "카드를 넣어주세요.
+또는 카드 단말기에 태그해주세요.";
+                    break;
+                case "포인트":
+                    paymentGuideMessageText.text = "포인트를 사용합니다.
+확인 버튼을 눌러 결제를 완료해주세요.";
+                    break;
+                case "애플페이":
+                    paymentGuideMessageText.text = "아이폰 또는 애플워치를 단말기에 대주세요.";
+                    break;
+                case "삼성페이":
+                    paymentGuideMessageText.text = "휴대폰을 단말기에 대주세요.";
+                    break;
+                default:
+                    paymentGuideMessageText.text = "결제를 진행해주세요.";
+                    break;
+            }
+        }
+
+        panelManager.OpenPopup(panelManager.paymentGuidePopup);
+    }
+
+    /// <summary>
+    /// 결제안내 팝업 확인 후 결제를 완료한다.
+    /// </summary>
+    private void FinalizePayment()
+    {
+        panelManager.ClosePopup(panelManager.paymentGuidePopup);
+        panelManager.ClosePopup(panelManager.orderListPopup);
+
+        BuildReceipt();
+
+        if (successText != null)
+            successText.text = "결제 완료! 🍎";
+
+        panelManager.GoToComplete();
+    }
+
+    /// <summary>
+    /// 영수증 문자열을 생성한다.
+    /// </summary>
     private void BuildReceipt()
     {
         if (receiptContentText == null) return;
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("================================");
-        sb.AppendLine("     🍎  Fruity Fresh");
-        sb.AppendLine("================================");
-        sb.AppendLine($"  일시: {System.DateTime.Now:yyyy-MM-dd HH:mm}");
-        sb.AppendLine($"  수령: {(panelManager.deliveryMethod == "pickup" ? "픽업" : "배송")}");
-        sb.AppendLine("────────────────────────────────");
+        sb.AppendLine("[ Fruity Fresh 영수증 ]");
+        sb.AppendLine($"일시: {System.DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine($"수령: {(panelManager.deliveryMethod == "pickup" ? "픽업" : "배송")}");
+        sb.AppendLine("----------------------------------------");
 
         int total = 0;
         foreach (var item in productManager.cart)
         {
-            sb.AppendLine($"  {item.name,-10}  {item.price:N0}원");
-            total += item.price;
+            sb.AppendLine(item.name);
+            sb.AppendLine($"  옵션: {item.OptionSummary()}");
+            sb.AppendLine($"  수량: {item.quantity}개 / 금액: {item.totalPrice:N0}원");
+            total += item.totalPrice;
         }
 
-        sb.AppendLine("────────────────────────────────");
-        sb.AppendLine($"  합   계:  {total:N0}원");
-        sb.AppendLine($"  결제방법: {_payMethod}");
-        sb.AppendLine("================================");
-        sb.AppendLine("  감사합니다! 또 방문해주세요 😊");
+        sb.AppendLine("----------------------------------------");
+        sb.AppendLine($"합계: {total:N0}원");
+        sb.AppendLine($"결제: {payMethod}");
 
         receiptContentText.text = sb.ToString();
     }
 
-    // =========================================================
-    //  홈으로 돌아가기
-    //  장바구니 초기화 + StartPanel 이동
-    // =========================================================
-    private void GoHome()
+    // 첫 화면으로 돌아갈 때 상태 초기화
+    public void GoHome()
     {
-        // ProductManager의 장바구니 초기화
         productManager.ClearCart();
-
-        // 결제 상태 초기화
-        _payMethod = "";
-        ClearPayBorders();
-        confirmBtn.interactable = false;
-
-        // StartPanel로 이동
-        panelManager.Show(panelManager.startPanel);
+        ResetPaymentState();
+        panelManager.GoToIntro();
     }
 
-    // =========================================================
-    //  결제방법 테두리 전체 초기화 헬퍼
-    // =========================================================
-    private void ClearPayBorders()
-    {
-        if (cardBorderImg)  cardBorderImg.color  = COL_UNSELECTED;
-        if (cashBorderImg)  cashBorderImg.color  = COL_UNSELECTED;
-        if (pointBorderImg) pointBorderImg.color = COL_UNSELECTED;
-    }
-
-    // =========================================================
-    //  장바구니 합계 계산 헬퍼
-    // =========================================================
-    private int GetTotal()
+    // 현재 장바구니 총액 계산
+    private int GetCartTotal()
     {
         int total = 0;
-        foreach (var item in productManager.cart) total += item.price;
+        foreach (var item in productManager.cart) total += item.totalPrice;
         return total;
+    }
+
+    // 선택 표시 이미지 초기화
+    private void ClearSelectImages()
+    {
+        if (cardSelectImg != null) cardSelectImg.color = ClearColor;
+        if (pointSelectImg != null) pointSelectImg.color = ClearColor;
+        if (applePaySelectImg != null) applePaySelectImg.color = ClearColor;
+        if (samsungPaySelectImg != null) samsungPaySelectImg.color = ClearColor;
+    }
+
+    // 주문목록에 생성한 행 제거
+    private void ClearRows(List<GameObject> rows)
+    {
+        foreach (var row in rows) Destroy(row);
+        rows.Clear();
+    }
+
+    private void AddClick(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button != null) button.onClick.AddListener(action);
+    }
+
+    private void SetText(Text[] texts, int index, string value)
+    {
+        if (texts.Length > index) texts[index].text = value;
     }
 }

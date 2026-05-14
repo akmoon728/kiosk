@@ -2,231 +2,365 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// ================================================================
-//  Script 2 : ProductManager.cs
-//  [ 상품 추가 + 옵션 설정 팝업창 ]
+// <summary>
+// Script2_ProductManager.cs 스타일 정리 버전
+// - 일반과일 / 컵과일 / 선물세트 옵션 팝업 관리
+// - 크기 / 당도 / 구성 / 포장 / 수량 선택 처리
+// - 장바구니 추가 및 장바구니 목록 갱신
 //
-//  담당 역할:
-//  - 상품 카드 버튼 클릭 → 옵션 팝업 열기
-//  - 옵션 팝업에서 수량 조절 + 담기 버튼
-//  - 장바구니 목록 RightCartPanel에 표시
-//  - 구매목록 팝업(cartListPopup) 내용 갱신
-//
-//  상품 카드 버튼 연결 방법:
-//  Button → OnClick() → ProductManager.OpenOptionPopup("사과", 8000)
+// 버튼 연결 예시
+// - 사과 이미지 버튼     -> OpenFruitOption("사과", 5000)
+// - 컵과일 M 버튼       -> OpenCupOption("혼합컵 M", 6500)
+// - 선물세트 대 버튼    -> OpenGiftOption("프리미엄 세트", 30000)
 // ================================================================
-public class ProductManager : MonoBehaviour
+/// </summary>
+public class Script2_ProductManager : MonoBehaviour
 {
-    // ──────────────────────────────────────────────────────────
-    //  PanelManager 참조
-    //  팝업 열기/닫기, 패널 전환을 PanelManager에 위임
-    //  Inspector: KioskController 오브젝트의 PanelManager 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== PanelManager 참조 =====")]
-    public PanelManager panelManager;
-
-    // ──────────────────────────────────────────────────────────
-    //  옵션 팝업창 내부 UI
-    //  Inspector: OptionPopup 안의 각 UI 요소 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 옵션 팝업 내부 UI =====")]
-    public Text    optionProductNameText;  // 상품명 표시 텍스트
-    public Text    optionUnitPriceText;    // 단가 표시 텍스트 "8,000원"
-    public Text    optionTotalPriceText;   // 합계 표시 텍스트 "합계: 16,000원"
-
-    // 수량 조절 버튼
-    public Button  minusBtn;               // - 버튼 (수량 감소)
-    public Text    quantityText;           // 수량 숫자 표시
-    public Button  plusBtn;                // + 버튼 (수량 증가)
-
-    // 담기 버튼
-    public Button  addToCartBtn;           // "장바구니 담기" 버튼
-
-    // ──────────────────────────────────────────────────────────
-    //  RightCartPanel UI
-    //  Inspector: ProductPanel > RightCartPanel 안의 UI 연결
-    // ──────────────────────────────────────────────────────────
-    [Header("===== RightCartPanel UI =====")]
-    public Text    cartCountText;          // "3개 담김"
-    public Text    cartTotalText;          // "합계: 12,000원"
-    public Button  goPayBtn;              // "결제하기" 버튼 (장바구니 있을 때만 활성)
-
-    // ──────────────────────────────────────────────────────────
-    //  구매목록 팝업 내부 UI
-    //  Inspector: CartListPopup 안의 UI 연결
-    //  CartListPopup 구조:
-    //  CartListPopup
-    //  ├ TitleText      "구매 목록"
-    //  ├ ScrollView
-    //  │  └ Content     ← cartListContent 연결
-    //  ├ TotalText      ← cartListTotalText 연결
-    //  └ CloseButton
-    // ──────────────────────────────────────────────────────────
-    [Header("===== 구매목록 팝업 내부 UI =====")]
-    public Transform cartListContent;      // ScrollView > Content (항목 동적 생성 위치)
-    public Text      cartListTotalText;    // 팝업 안 합계 텍스트
-    public GameObject cartListRowPrefab;   // 목록 한 줄 프리팹 (Text 2개: 상품명, 가격)
-
-    // ──────────────────────────────────────────────────────────
-    //  내부 데이터
-    // ──────────────────────────────────────────────────────────
-
-    // 장바구니 리스트: (상품명, 단가) 튜플 리스트
-    [HideInInspector]
-    public readonly List<(string name, int price)> cart = new();
-
-    // 현재 옵션 팝업에 표시 중인 상품 정보
-    private string _currentName  = "";
-    private int    _currentPrice = 0;
-    private int    _quantity     = 1;       // 현재 선택 수량
-
-    // 생성된 목록 행 오브젝트 추적 (갱신 시 삭제용)
-    private readonly List<GameObject> _cartRowObjs = new();
-
-    // =========================================================
-    //  Start: 버튼 이벤트 연결
-    // =========================================================
-    void Start()
+    public enum ProductCategory
     {
-        // ── 수량 버튼 ──────────────────────────────────────────
-        // - 버튼: 수량 1 감소 (최소 1)
-        minusBtn.onClick.AddListener(() =>
-        {
-            _quantity = Mathf.Max(1, _quantity - 1);
-            RefreshOptionPrice();
-        });
-
-        // + 버튼: 수량 1 증가
-        plusBtn.onClick.AddListener(() =>
-        {
-            _quantity++;
-            RefreshOptionPrice();
-        });
-
-        // ── 담기 버튼 ─────────────────────────────────────────
-        // 클릭 시 현재 상품을 수량만큼 장바구니에 추가
-        addToCartBtn.onClick.AddListener(AddToCart);
-
-        // ── 결제하기 버튼 초기 비활성 ────────────────────────
-        // 장바구니가 비어 있으면 결제 불가
-        goPayBtn.interactable = false;
+        Fruit,
+        Cup,
+        Gift
     }
 
-    // =========================================================
-    //  옵션 팝업 열기
-    //  상품 카드 버튼의 OnClick에서 호출
-    //  예) ProductManager.OpenOptionPopup("사과", 8000)
-    // =========================================================
-    public void OpenOptionPopup(string productName, int unitPrice)
+    [System.Serializable]
+    public class CartItem
     {
-        // 현재 상품 정보 저장
-        _currentName  = productName;
-        _currentPrice = unitPrice;
-        _quantity     = 1; // 수량 초기화
+        public string name;             // 상품명
+        public ProductCategory category;// 상품 타입
+        public string size;             // 크기
+        public string sweetness;        // 당도
+        public string composition;      // 컵과일 구성
+        public string packageType;      // 선물세트 포장
+        public int quantity;            // 수량
+        public int unitPrice;           // 단가
+        public int totalPrice;          // 총 금액
 
-        // 팝업 UI 갱신
-        optionProductNameText.text = productName;
-        optionUnitPriceText.text   = $"{unitPrice:N0}원";
-        RefreshOptionPrice();
+        /// <summary>
+        /// 선택된 옵션을 문자열로 반환한다.
+        /// </summary>
+        public string OptionSummary()
+        {
+            var options = new List<string>();
+            if (!string.IsNullOrEmpty(size)) options.Add($"크기:{size}");
+            if (!string.IsNullOrEmpty(sweetness)) options.Add($"당도:{sweetness}");
+            if (!string.IsNullOrEmpty(composition)) options.Add($"구성:{composition}");
+            if (!string.IsNullOrEmpty(packageType)) options.Add($"포장:{packageType}");
+            return string.Join(" / ", options);
+        }
+    }
 
-        // 팝업 열기 (PanelManager에 위임)
+    [Header("외부 참조")]
+    public Script1_PanelManager panelManager;  //팝업 제어용 panelmanager 참조
+
+    [Header("옵션 팝업 텍스트")]
+    public Text optionTitleText;       // 팝업 상단 상품명
+    public Text optionCategoryText;    // 카테고리명
+    public Text optionUnitPriceText;   // 계산된 단가
+    public Text optionSelectedText;    // 선택한 옵션 요약
+    public Text optionTotalPriceText;  // 최종 결제 금액
+
+    [Header("수량")]
+    public Button minusBtn;            // 수량 감소 버튼
+    public Text quantityText;          // 현재 수량 표시
+    public Button plusBtn;             // 수량 증가 버튼
+    public Button addToCartBtn;        // 장바구니 담기 버튼
+
+    [Header("크기 버튼")]
+    public Button sizeSmallBtn;
+    public Button sizeMediumBtn;
+    public Button sizeLargeBtn;
+
+    [Header("당도 버튼")]
+    public Button sweetLowBtn;
+    public Button sweetMediumBtn;
+    public Button sweetHighBtn;
+
+    [Header("컵과일 구성 버튼")]
+    public Button cupSingleBtn;
+    public Button cupMixBtn;
+    public Button cupPremiumBtn;
+
+    [Header("포장 버튼")]
+    public Button packBasicBtn;
+    public Button packRibbonBtn;
+    public Button packLuxuryBtn;
+
+    [Header("옵션 그룹")]
+    public GameObject sizeGroup;       // 크기 옵션 그룹
+    public GameObject sweetGroup;      // 당도 옵션 그룹
+    public GameObject cutGroup;        // 커팅 옵션 그룹
+    public GameObject cupGroup;        // 컵과일 구성 그룹
+    public GameObject packGroup;       // 포장 옵션 그룹
+
+    [Header("장바구니 요약")]
+    public Text cartCountText;         // 장바구니 총 수량
+    public Text cartTotalText;         // 장바구니 총 금액
+    public Button goPayBtn;            // 결제하기 버튼
+
+    [Header("장바구니 팝업")]
+    public Transform cartListContent;  // 장바구니 항목이 생성될 부모
+    public Text cartListTotalText;     // 장바구니 총합 텍스트
+    public GameObject cartListRowPrefab;// 장바구니 한 줄 프리팹
+
+    [HideInInspector] public readonly List<CartItem> cart = new();
+
+    private readonly List<GameObject> cartRows = new();
+
+    private ProductCategory currentCategory;
+    private string currentName;
+    private int basePrice;
+    private int quantity = 1;
+
+    private string size = "중";
+    private string sweetness = "보통";
+    private string composition = "혼합";
+    private string packageType = "기본";
+
+    private void Start()
+    {
+        BindButtons();
+        if (goPayBtn != null) goPayBtn.interactable = false; // 장바구니가 비어 있으면 결제 버튼 비활성화
+    }
+
+    /// <summary>
+    /// 옵션 관련 버튼 이벤트를 연결한다.
+    /// </summary>
+    private void BindButtons()
+    {
+        AddClick(minusBtn, () => ChangeQuantity(-1));
+        AddClick(plusBtn, () => ChangeQuantity(1));
+        AddClick(addToCartBtn, AddCurrentItemToCart);
+
+        AddClick(sizeSmallBtn, () => SetSize("소"));
+        AddClick(sizeMediumBtn, () => SetSize("중"));
+        AddClick(sizeLargeBtn, () => SetSize("대"));
+
+        AddClick(sweetLowBtn, () => SetSweetness("낮음"));
+        AddClick(sweetMediumBtn, () => SetSweetness("보통"));
+        AddClick(sweetHighBtn, () => SetSweetness("높음"));
+
+        AddClick(cupSingleBtn, () => SetComposition("단일"));
+        AddClick(cupMixBtn, () => SetComposition("혼합"));
+        AddClick(cupPremiumBtn, () => SetComposition("프리미엄"));
+
+        AddClick(packBasicBtn, () => SetPackage("기본"));
+        AddClick(packRibbonBtn, () => SetPackage("리본"));
+        AddClick(packLuxuryBtn, () => SetPackage("고급"));
+    }
+    // 일반과일 선택 시 호출
+    public void OpenFruitOption(string name, int price)
+    {
+        SetupOption(ProductCategory.Fruit, name, price, true, true, false, false);
+    }
+    // 컵과일 선택 시 호출
+    public void OpenCupOption(string name, int price)
+    {
+        SetupOption(ProductCategory.Cup, name, price, true, false, true, false);
+    }
+    // 선물세트 선택 시 호출
+    public void OpenGiftOption(string name, int price)
+    {
+        SetupOption(ProductCategory.Gift, name, price, true, false, false, true);
+    }
+
+    /// <summary>
+    /// 선택한 상품에 맞게 옵션 팝업을 초기화한다.
+    /// </summary>
+    // 옵션 팝업 공통 세팅
+    private void SetupOption(ProductCategory category, string name, int price, bool showSize, bool showSweet, bool showCup, bool showPack)
+    {
+        currentCategory = category;
+        currentName = name;
+        basePrice = price;
+        quantity = 1;
+        // 카테고리별 기본 옵션 초기화
+        size = "중";
+        sweetness = category == ProductCategory.Fruit ? "보통" : "";
+        composition = category == ProductCategory.Cup ? "혼합" : "";
+        packageType = category == ProductCategory.Gift ? "기본" : "";
+
+        // 카테고리에 맞는 옵션 그룹만 화면에 표시
+        SetActive(sizeGroup, showSize);
+        SetActive(sweetGroup, showSweet);
+        SetActive(cupGroup, showCup);
+        SetActive(packGroup, showPack);
+
+        RefreshOptionUI();
         panelManager.OpenPopup(panelManager.optionPopup);
     }
 
-    // =========================================================
-    //  옵션 팝업 가격 갱신
-    //  수량 변경 시마다 호출
-    // =========================================================
-    private void RefreshOptionPrice()
+    // 수량 변경, 최소 1개 유지
+    private void ChangeQuantity(int delta)
     {
-        // 수량 텍스트 갱신
-        quantityText.text = _quantity.ToString();
-
-        // 합계 = 단가 × 수량
-        int total = _currentPrice * _quantity;
-        optionTotalPriceText.text = $"합계: {total:N0}원";
+        quantity = Mathf.Max(1, quantity + delta);
+        RefreshOptionUI();
     }
 
-    // =========================================================
-    //  장바구니 담기
-    //  "담기" 버튼 클릭 시 실행
-    // =========================================================
-    private void AddToCart()
-    {
-        // 수량만큼 반복 추가 (동일 상품을 수량만큼)
-        for (int i = 0; i < _quantity; i++)
-            cart.Add((_currentName, _currentPrice));
+    private void SetSize(string value) { size = value; RefreshOptionUI(); }
+    private void SetSweetness(string value) { sweetness = value; RefreshOptionUI(); }
+    private void SetComposition(string value) { composition = value; RefreshOptionUI(); }
+    private void SetPackage(string value) { packageType = value; RefreshOptionUI(); }
 
-        // RightCartPanel 텍스트 갱신
+    /// <summary>
+    /// 옵션 팝업의 텍스트와 가격을 갱신한다.
+    /// </summary>
+    /// 옵션 팝업 안의 텍스트를 전체 갱신
+    private void RefreshOptionUI()
+    {
+        int unitPrice = CalculateUnitPrice();
+        int totalPrice = unitPrice * quantity;
+
+        if (optionTitleText != null) optionTitleText.text = currentName;
+        if (optionCategoryText != null) optionCategoryText.text = CategoryName(currentCategory);
+        if (quantityText != null) quantityText.text = quantity.ToString();
+        if (optionUnitPriceText != null) optionUnitPriceText.text = $"단가: {unitPrice:N0}원";
+        if (optionSelectedText != null) optionSelectedText.text = CurrentOptionSummary();
+        if (optionTotalPriceText != null) optionTotalPriceText.text = $"합계: {totalPrice:N0}원";
+    }
+
+    /// <summary>
+    /// 선택된 옵션 기준으로 단가를 계산한다.
+    /// </summary>
+    private int CalculateUnitPrice()
+    {
+        int price = basePrice;
+
+        price += size switch
+        {
+            "중" => 1000,
+            "대" => 2000,
+            _ => 0
+        };
+
+        if (sweetness == "높음") price += 1000;
+        if (composition == "혼합") price += 1000;
+        if (composition == "프리미엄") price += 2000;
+        if (packageType == "리본") price += 2000;
+        if (packageType == "고급") price += 5000;
+
+        return price;
+    }
+
+    private string CurrentOptionSummary()
+    {
+        var options = new List<string>();
+        if (IsActive(sizeGroup)) options.Add($"크기:{size}");
+        if (IsActive(sweetGroup)) options.Add($"당도:{sweetness}");
+        if (IsActive(cupGroup)) options.Add($"구성:{composition}");
+        if (IsActive(packGroup)) options.Add($"포장:{packageType}");
+        return string.Join(" / ", options);
+    }
+
+    /// <summary>
+    /// 현재 선택한 상품을 장바구니에 추가한다.
+    /// </summary>
+    private void AddCurrentItemToCart()
+    {
+        int unitPrice = CalculateUnitPrice();
+
+        cart.Add(new CartItem
+        {
+            name = currentName,
+            category = currentCategory,
+            size = IsActive(sizeGroup) ? size : "",
+            sweetness = IsActive(sweetGroup) ? sweetness : "",
+            composition = IsActive(cupGroup) ? composition : "",
+            packageType = IsActive(packGroup) ? packageType : "",
+            quantity = quantity,
+            unitPrice = unitPrice,
+            totalPrice = unitPrice * quantity
+        });
+
         RefreshCartPanel();
-
-        // 구매목록 팝업 내용도 갱신
-        RefreshCartListPopup();
-
-        // 옵션 팝업 닫기
+        RefreshCartPopup();
         panelManager.ClosePopup(panelManager.optionPopup);
-
-        Debug.Log($"[담기] {_currentName} x{_quantity} = {_currentPrice * _quantity:N0}원");
     }
-
-    // =========================================================
-    //  RightCartPanel 텍스트 갱신
-    //  상품 담을 때마다 카운트/합계 업데이트
-    // =========================================================
+    // ProductPanel의 장바구니 요약 갱신
     public void RefreshCartPanel()
     {
-        int total = 0;
-        foreach (var item in cart) total += item.price;
-
-        cartCountText.text = $"{cart.Count}개 담김";
-        cartTotalText.text = $"합계: {total:N0}원";
-
-        // 장바구니에 상품 있을 때만 결제 버튼 활성
-        goPayBtn.interactable = cart.Count > 0;
-    }
-
-    // =========================================================
-    //  구매목록 팝업 내용 갱신
-    //  팝업 열릴 때 또는 상품 추가/삭제 시 호출
-    // =========================================================
-    public void RefreshCartListPopup()
-    {
-        // 기존 행 삭제
-        foreach (var row in _cartRowObjs) Destroy(row);
-        _cartRowObjs.Clear();
-
-        // 상품이 없으면 빈 상태로 종료
-        if (cartListContent == null || cartListRowPrefab == null) return;
-
-        int total = 0;
+        int totalCount = 0;
+        int totalPrice = 0;
 
         foreach (var item in cart)
         {
-            // 프리팹으로 한 줄 생성
-            var row  = Instantiate(cartListRowPrefab, cartListContent);
-            var txts = row.GetComponentsInChildren<Text>();
-
-            // 텍스트 인덱스 약속:
-            // 0 = 상품명, 1 = 가격
-            if (txts.Length > 0) txts[0].text = item.name;
-            if (txts.Length > 1) txts[1].text = $"{item.price:N0}원";
-
-            _cartRowObjs.Add(row);
-            total += item.price;
+            totalCount += item.quantity;
+            totalPrice += item.totalPrice;
         }
 
-        // 팝업 합계 텍스트 갱신
-        if (cartListTotalText)
-            cartListTotalText.text = $"합계: {total:N0}원";
+        if (cartCountText != null) cartCountText.text = $"{totalCount}개 담김";
+        if (cartTotalText != null) cartTotalText.text = $"합계: {totalPrice:N0}원";
+        if (goPayBtn != null) goPayBtn.interactable = cart.Count > 0;
     }
 
-    // =========================================================
-    //  장바구니 초기화 (GoHome 시 PaymentManager에서 호출)
-    // =========================================================
+    /// <summary>
+    /// 장바구니 팝업 목록을 다시 그린다.
+    /// </summary>
+    /// ProductPanel의 장바구니 요약 갱신
+    public void RefreshCartPopup()
+    {
+        ClearRows(cartRows);
+        if (cartListContent == null || cartListRowPrefab == null) return;
+
+        int totalPrice = 0;
+        foreach (var item in cart)
+        {
+            var row = Instantiate(cartListRowPrefab, cartListContent);
+            var texts = row.GetComponentsInChildren<Text>();
+
+            SetText(texts, 0, item.name);
+            SetText(texts, 1, item.OptionSummary());
+            SetText(texts, 2, $"{item.quantity}개");
+            SetText(texts, 3, $"{item.totalPrice:N0}원");
+
+            cartRows.Add(row);
+            totalPrice += item.totalPrice;
+        }
+
+        if (cartListTotalText != null) cartListTotalText.text = $"합계: {totalPrice:N0}원";
+    }
+    // 새 주문 시작 시 장바구니 비우기
     public void ClearCart()
     {
         cart.Clear();
         RefreshCartPanel();
-        RefreshCartListPopup();
+        RefreshCartPopup();
+    }
+
+    private string CategoryName(ProductCategory category)
+    {
+        return category switch
+        {
+            ProductCategory.Fruit => "일반과일",
+            ProductCategory.Cup => "컵과일",
+            ProductCategory.Gift => "선물세트",
+            _ => "상품"
+        };
+    }
+
+    private void AddClick(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button != null) button.onClick.AddListener(action);
+    }
+
+    private void SetActive(GameObject obj, bool active)
+    {
+        if (obj != null) obj.SetActive(active);
+    }
+
+    private bool IsActive(GameObject obj)
+    {
+        return obj != null && obj.activeSelf;
+    }
+
+    private void ClearRows(List<GameObject> rows)
+    {
+        foreach (var row in rows) Destroy(row);
+        rows.Clear();
+    }
+
+    private void SetText(Text[] texts, int index, string value)
+    {
+        if (texts.Length > index) texts[index].text = value;
     }
 }
