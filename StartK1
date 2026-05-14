@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class ScrStartK1 : MonoBehaviour
+public class ScrStart : MonoBehaviour
 {
     [Header("UI References")]
     public Button startButton;
